@@ -19,6 +19,7 @@ pub fn main() -> iced::Result {
     DapDownload::run(Settings {
         window: window::Settings {
             size: (800, 480),
+            position:iced::window::Position::Centered,
             resizable: false,
             ..window::Settings::default()
         },
