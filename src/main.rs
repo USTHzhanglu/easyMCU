@@ -1,16 +1,22 @@
 #![windows_subsystem = "windows"] // 隐藏windows console
 
-use std::fmt::Debug;
-use std::path::PathBuf;
-
 use iced::subscription;
 use iced::widget::{button, combo_box, container, pick_list, text, Column, Row};
 use iced::window;
 use iced::Event;
 use iced::{executor, Padding};
 use iced::{Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
+use image;
+use rust_embed::RustEmbed;
+use std::fmt::Debug;
+use std::path::PathBuf;
+
 use probe_rs::flashing::{BinOptions, FileDownloadError, FlashError};
 use probe_rs::{flashing, DebugProbeError, Permissions, Probe, ProbeCreationError, Session};
+
+#[derive(RustEmbed)]
+#[folder = "./ico/"]
+struct Asset;
 
 pub fn main() -> iced::Result {
     DapDownload::run(Settings {
@@ -18,7 +24,14 @@ pub fn main() -> iced::Result {
             size: (800, 480),
             position: iced::window::Position::Centered,
             resizable: false,
-            icon: Some(window::icon::from_file("./ico/icon.ico").unwrap()),
+            //icon: Some(window::icon::from_file("./ico/icon.ico").unwrap()),
+            icon: Some(
+                window::icon::from_file_data(
+                    &Asset::get("icon.ico").unwrap().data,
+                    Some(image::ImageFormat::Ico),
+                )
+                .unwrap(),
+            ),
             ..window::Settings::default()
         },
         ..Settings::default()

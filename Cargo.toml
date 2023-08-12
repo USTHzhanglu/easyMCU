@@ -1,5 +1,5 @@
 [package]
-name = "dap_download"
+name = "easy_mcu"
 version = "0.4.0"
 edition = "2021"
 build = "build.rs"
@@ -12,6 +12,8 @@ lto = true
 [dependencies]
 probe-rs = "0.20.0"
 iced = {version ="0.10.0", features = ["image"]}
+rust-embed="6.8.1"
+image = "0.24.7"
 
 [build-dependencies]
 embed-resource = "2.2"
