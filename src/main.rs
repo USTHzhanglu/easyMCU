@@ -90,7 +90,10 @@ impl Application for DapDownload {
     }
 
     fn title(&self) -> String {
-        String::from("DAP Download")
+        String::from("easyMCU")
+    }
+    fn theme(&self) -> Self::Theme {
+        Theme::Dark
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
