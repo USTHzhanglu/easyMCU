@@ -1,26 +1,24 @@
-#![windows_subsystem = "windows"]   // 隐藏windows console
+#![windows_subsystem = "windows"] // 隐藏windows console
 
 use std::fmt::Debug;
 use std::path::PathBuf;
 
-use iced::{executor, Padding};
-use iced::{
-    Alignment, Application, Command, Element, Length, Settings, Subscription,
-    Theme,
-};
-use iced::Event;
 use iced::subscription;
-use iced::widget::{button, Column, combo_box, container, pick_list, Row, text};
+use iced::widget::{button, combo_box, container, pick_list, text, Column, Row};
 use iced::window;
-use probe_rs::{DebugProbeError, flashing, Permissions, Probe, ProbeCreationError, Session};
+use iced::Event;
+use iced::{executor, Padding};
+use iced::{Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
 use probe_rs::flashing::{BinOptions, FileDownloadError, FlashError};
+use probe_rs::{flashing, DebugProbeError, Permissions, Probe, ProbeCreationError, Session};
 
 pub fn main() -> iced::Result {
     DapDownload::run(Settings {
         window: window::Settings {
             size: (800, 480),
-            position:iced::window::Position::Centered,
+            position: iced::window::Position::Centered,
             resizable: false,
+            icon: Some(window::icon::from_file("./ico/icon.ico").unwrap()),
             ..window::Settings::default()
         },
         ..Settings::default()
@@ -62,7 +60,6 @@ enum Message {
     Flash,
 }
 
-
 impl Application for DapDownload {
     type Executor = executor::Default;
     type Message = Message;
@@ -70,23 +67,24 @@ impl Application for DapDownload {
     type Flags = ();
 
     fn new(_flags: ()) -> (DapDownload, Command<Message>) {
-        (Self {
-            probe_list: list_probe(),
-            probe_selected: match list_probe().len() {
-                0 => None,
-                _ => Some(0),
+        (
+            Self {
+                probe_list: list_probe(),
+                probe_selected: match list_probe().len() {
+                    0 => None,
+                    _ => Some(0),
+                },
+
+                target_list: combo_box::State::new(TargetMCU::ALL.to_vec()),
+                target_selected: None,
+
+                file_path: None,
+                file_format: None,
+
+                log_text: String::from("Drag and drop a file here"),
             },
-
-            target_list: combo_box::State::new(TargetMCU::ALL.to_vec()),
-            target_selected: None,
-
-            file_path: None,
-            file_format: None,
-
-            log_text: String::from("Drag and drop a file here"),
-        }, {
-             Command::none()
-         })
+            { Command::none() },
+        )
     }
 
     fn title(&self) -> String {
@@ -99,7 +97,12 @@ impl Application for DapDownload {
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             Message::ProbeSelected(probe) => {
-                self.probe_selected = Some(self.probe_list.iter().position(|r| r == probe.as_str()).unwrap());
+                self.probe_selected = Some(
+                    self.probe_list
+                        .iter()
+                        .position(|r| r == probe.as_str())
+                        .unwrap(),
+                );
                 Command::none()
             }
 
@@ -232,11 +235,9 @@ impl Application for DapDownload {
             }),
             Message::ProbeSelected,
         )
-            .width(150);
+        .width(150);
 
-        let probe_list_btn = button(
-            text("Ref")
-        )
+        let probe_list_btn = button(text("Ref"))
             .width(50)
             .on_press(Message::ProbeRefresh);
 
@@ -253,7 +254,7 @@ impl Application for DapDownload {
             self.target_selected.as_ref(),
             Message::TargetSelected,
         )
-            .width(200);
+        .width(200);
 
         let target_box = Column::new()
             .width(240)
@@ -262,15 +263,13 @@ impl Application for DapDownload {
             .push(probe_box)
             .push(target_list);
 
-
-        let log = text(self.log_text.clone())
-            .width(200);
+        let log = text(self.log_text.clone()).width(200);
 
         let file_path = text(match self.file_path.clone() {
             None => "No file selected".to_string(),
             Some(path) => "Now Loaded: ".to_string() + path.as_str(),
         })
-            .width(200);
+        .width(200);
 
         let path_box = Column::new()
             .width(240)
@@ -279,17 +278,13 @@ impl Application for DapDownload {
             .push(log)
             .push(file_path);
 
-        let erase_btn = button(
-            text("Erase")
-        )
+        let erase_btn = button(text("Erase"))
             .width(200)
             .height(50)
             .padding(Padding::from([13, 80]))
             .on_press(Message::Erase);
 
-        let flash_btn = button(
-            text("Flash")
-        )
+        let flash_btn = button(text("Flash"))
             .width(200)
             .height(50)
             .padding(Padding::from([13, 80]))
@@ -319,9 +314,7 @@ impl Application for DapDownload {
 
     fn subscription(&self) -> Subscription<Message> {
         subscription::events_with(|event, _| match event {
-            Event::Window(window::Event::FileDropped(path)) => {
-                Some(Message::FileSelected(path))
-            }
+            Event::Window(window::Event::FileDropped(path)) => Some(Message::FileSelected(path)),
             _ => None,
         })
     }
@@ -338,24 +331,36 @@ fn list_probe() -> Vec<String> {
 
 fn probe_open(probe_id: usize) -> Result<Probe, DebugProbeError> {
     let probes = Probe::list_all();
-    let probe = probes.get(probe_id)
-        .ok_or(DebugProbeError::ProbeCouldNotBeCreated(ProbeCreationError::NotFound))?
+    let probe = probes
+        .get(probe_id)
+        .ok_or(DebugProbeError::ProbeCouldNotBeCreated(
+            ProbeCreationError::NotFound,
+        ))?
         .open()?;
     Ok(probe)
 }
-
 
 fn probe_attach(probe: Probe, target: String) -> Result<Session, probe_rs::Error> {
     let session = probe.attach(target, Permissions::default())?;
     Ok(session)
 }
 
-
-fn flash_target(mut session: Session, path: String, format: String) -> Result<(), FileDownloadError> {
+fn flash_target(
+    mut session: Session,
+    path: String,
+    format: String,
+) -> Result<(), FileDownloadError> {
     flashing::erase_all(&mut session, None).unwrap();
 
     let _ = match format.as_str() {
-        "bin" => flashing::download_file(&mut session, path, flashing::Format::Bin(BinOptions { base_address: None, skip: 0 }))?,
+        "bin" => flashing::download_file(
+            &mut session,
+            path,
+            flashing::Format::Bin(BinOptions {
+                base_address: None,
+                skip: 0,
+            }),
+        )?,
         "hex" => flashing::download_file(&mut session, path, flashing::Format::Hex)?,
         "elf" => flashing::download_file(&mut session, path, flashing::Format::Elf)?,
         _ => (),
@@ -366,12 +371,10 @@ fn flash_target(mut session: Session, path: String, format: String) -> Result<()
     return Ok(());
 }
 
-
 fn erase_target(mut session: Session) -> Result<(), FlashError> {
     flashing::erase_all(&mut session, None)?;
     return Ok(());
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TargetMCU {
@@ -381,10 +384,7 @@ pub enum TargetMCU {
 }
 
 impl TargetMCU {
-    const ALL: [TargetMCU; 2] = [
-        TargetMCU::STM32F103C8,
-        TargetMCU::STM32F103CB,
-    ];
+    const ALL: [TargetMCU; 2] = [TargetMCU::STM32F103C8, TargetMCU::STM32F103CB];
 
     fn to_string(&self) -> String {
         match self {
@@ -393,7 +393,6 @@ impl TargetMCU {
         }
     }
 }
-
 
 impl std::fmt::Display for TargetMCU {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
