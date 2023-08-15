@@ -1,15 +1,18 @@
 #![windows_subsystem = "windows"] // 隐藏windows console
 
+use std::fmt::Debug;
+use std::path::PathBuf;
+
+use rust_embed::RustEmbed;
+#[cfg(target_os = "windows")]
+use winapi::um::winuser;
+
 use iced::subscription;
 use iced::widget::{button, combo_box, container, pick_list, text, Column, Row};
 use iced::window;
 use iced::Event;
 use iced::{executor, Padding};
 use iced::{Alignment, Application, Command, Element, Length, Settings, Subscription, Theme};
-use image;
-use rust_embed::RustEmbed;
-use std::fmt::Debug;
-use std::path::PathBuf;
 
 use probe_rs::flashing::{BinOptions, FileDownloadError, FlashError};
 use probe_rs::{flashing, DebugProbeError, Permissions, Probe, ProbeCreationError, Session};
@@ -18,8 +21,33 @@ use probe_rs::{flashing, DebugProbeError, Permissions, Probe, ProbeCreationError
 #[folder = "./ico/"]
 struct Asset;
 
+fn del_menu() -> bool {
+    if cfg!(target_os = "windows") {
+        let hwnd = unsafe {
+            winapi::um::winuser::FindWindowA(
+                std::ptr::null(),
+                // "Window Class".as_ptr() as *const i8,
+                "easyMCU".as_ptr() as *const i8,
+                // std::ptr::null(),
+            )
+        };
+
+        if hwnd == std::ptr::null_mut() {
+            return false;
+        }
+        println!("{:?}", hwnd); //不打印会失效？
+        let mut hwsytle: u32 =
+            unsafe { winuser::GetWindowLongA(hwnd, winuser::GWL_STYLE.try_into().unwrap()) } as u32;
+        unsafe {
+            hwsytle &= !(winuser::WS_MAXIMIZEBOX);
+            winuser::SetWindowLongA(hwnd, winuser::GWL_STYLE, hwsytle as i32);
+        };
+    };
+    return true;
+}
+
 pub fn main() -> iced::Result {
-    DapDownload::run(Settings {
+    let ret = DapDownload::run(Settings {
         window: window::Settings {
             size: (800, 480),
             position: iced::window::Position::Centered,
@@ -34,8 +62,10 @@ pub fn main() -> iced::Result {
             ),
             ..window::Settings::default()
         },
+
         ..Settings::default()
-    })
+    });
+    return ret;
 }
 
 #[derive(Debug)]
@@ -58,6 +88,7 @@ struct DapDownload {
 
 #[derive(Debug, Clone)]
 enum Message {
+    Focused,
     // 烧录器相关消息
     ProbeSelected(String),
     ProbeRefresh,
@@ -80,7 +111,7 @@ impl Application for DapDownload {
     type Flags = ();
 
     fn new(_flags: ()) -> (DapDownload, Command<Message>) {
-        (
+        let ret = (
             Self {
                 probe_list: list_probe(),
                 probe_selected: match list_probe().len() {
@@ -97,7 +128,9 @@ impl Application for DapDownload {
                 log_text: String::from("Drag and drop a file here"),
             },
             { Command::none() },
-        )
+        );
+
+        return ret;
     }
 
     fn title(&self) -> String {
@@ -109,6 +142,15 @@ impl Application for DapDownload {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
+            Message::Focused => {
+                static mut HAVE_DEL_MENU: bool = false;
+                unsafe {
+                    if HAVE_DEL_MENU == false {
+                        HAVE_DEL_MENU = del_menu();
+                    }
+                };
+                Command::none()
+            }
             Message::ProbeSelected(probe) => {
                 self.probe_selected = Some(
                     self.probe_list
@@ -328,6 +370,7 @@ impl Application for DapDownload {
     fn subscription(&self) -> Subscription<Message> {
         subscription::events_with(|event, _| match event {
             Event::Window(window::Event::FileDropped(path)) => Some(Message::FileSelected(path)),
+            Event::Window(window::Event::Focused) => Some(Message::Focused),
             _ => None,
         })
     }
